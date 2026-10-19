@@ -11,14 +11,14 @@
 
 <table>
   <tr>
-    <td align="center"><img src="assets/screenshots/shopping.png" width="200" alt="Shopping list with cheapest-store tip"/><br/><sub><b>Shopping</b></sub></td>
+    <td align="center"><img src="assets/screenshots/shopping.png" width="200" alt="Shared shopping list"/><br/><sub><b>Shopping</b></sub></td>
     <td align="center"><img src="assets/screenshots/chores.png" width="200" alt="Chore scoreboard"/><br/><sub><b>Chores</b></sub></td>
     <td align="center"><img src="assets/screenshots/money.png" width="200" alt="Monthly money summary"/><br/><sub><b>Money</b></sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/screenshots/receipt.png" width="200" alt="Adding a receipt"/><br/><sub><b>Receipts</b></sub></td>
     <td align="center"><img src="assets/screenshots/meals.png" width="200" alt="Weekly meal plan"/><br/><sub><b>Meals</b></sub></td>
     <td align="center"><img src="assets/screenshots/us.png" width="200" alt="Shared note and date ideas"/><br/><sub><b>Us</b></sub></td>
+    <td align="center"><img src="assets/screenshots/settings.png" width="200" alt="Settings with language switcher"/><br/><sub><b>Settings</b></sub></td>
   </tr>
 </table>
 
