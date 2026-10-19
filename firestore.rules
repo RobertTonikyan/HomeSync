@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // פונקציית אימות: מוודא שהבקשה מגיעה ממשתמש רשום/מאומת
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // 1. ShoppingItem (פריטי רשימת קניות)
+    match /shopping_items/{itemId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // 2. Chore (מטלות בית)
+    match /chores/{choreId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // 3. CalendarEvent (אירועי יומן)
+    match /calendar_events/{eventId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // 4. CustomRecipe (מתכונים אישיים)
+    match /custom_recipes/{recipeId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // 5. DateIdea (רעיונות לדייטים)
+    match /date_ideas/{dateId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // 6. HouseNote (פתק יומי משותף)
+    match /house_notes/{noteId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // 7. MealPlan (תכנון ארוחות שבועי)
+    match /meal_plans/{planId} {
+      allow read, create, update, delete: if isAuthenticated();
+    }
+
+    // חסימת גישה לכל שאר האוספים שאינם מוגדרים
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
