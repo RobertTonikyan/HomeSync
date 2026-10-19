@@ -1,525 +1,459 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
+import { LayoutAnimation, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { CalendarDays, Crown, Flame, HandHeart, Plus, RotateCcw, Trash2, UserRound } from 'lucide-react-native';
+import { C, F, R, S } from '../../constants/theme';
+import { useApp } from '../../context/AppContext';
+import { diffDays, formatDay, formatToday, todayISO } from '../../lib/dates';
+import { lastWeekChampion, leader, Period, scoreboard } from '../../lib/competition';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  LayoutAnimation,
-  Alert,
-} from 'react-native';
-import * as Haptics from 'expo-haptics';
-import * as LucideIcons from 'lucide-react-native';
-import { Colors } from '../../constants/Colors';
-import { useApp, Chore, RecurrenceType, Assignee } from '../../context/AppContext';
+  Assignee,
+  Chore,
+  Effort,
+  EFFORT_POINTS,
+  MemberId,
+  otherMember,
+  RecurrenceType,
+  RESCUE_BONUS_RATE,
+} from '../../lib/types';
 import {
-  requestNotificationPermissions,
-  scheduleChoreNotification,
-} from '../../services/notifications';
+  Avatar,
+  Bar,
+  Button,
+  Card,
+  CheckCircle,
+  Chip,
+  ChipRow,
+  Empty,
+  Field,
+  IconButton,
+  List,
+  ListRow,
+  ProfileButton,
+  Row,
+  Screen,
+  Section,
+  Segmented,
+  Sheet,
+  T,
+  inset,
+  memberColor,
+  success,
+  tap,
+  useDir,
+} from '../../components/ui';
 
-const triggerSmoothAnimation = () => {
-  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-};
-
-const Icon = (Comp: any, props: { size?: number; color?: string; style?: any }) => {
-  const { color, ...rest } = props;
-  return React.createElement(Comp, { stroke: color, color, ...rest });
-};
-
-const RECURRENCE_LABELS: Record<RecurrenceType, string> = {
-  once: 'חד-פעמי',
-  daily: 'כל יום',
-  every_2_days: 'כל יומיים',
-  weekly: 'שבועי',
-};
-
-const ASSIGNEE_CONFIG: Record<Assignee, { label: string; color: string; badgeBg: string }> = {
-  me: { label: 'אני', color: Colors.primary, badgeBg: Colors.primaryMuted },
-  partner: { label: 'היא', color: '#EC4899', badgeBg: 'rgba(236, 72, 153, 0.16)' },
-  anyone: { label: 'שנינו', color: Colors.secondary, badgeBg: Colors.secondaryMuted },
-};
+const animate = () => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+const RECURRENCES: RecurrenceType[] = ['once', 'daily', 'every_2_days', 'weekly'];
+const EFFORTS: Effort[] = ['light', 'normal', 'heavy'];
 
 export default function ChoresScreen() {
-  const {
-    chores,
-    addChore,
-    toggleChore,
-    updateChoreAssignee,
-    deleteChore,
-    events,
-    addEvent,
-    deleteEvent,
-  } = useApp();
+  const app = useApp();
+  const { t, language, me, memberName, chores, choreLogs, events } = app;
+  const d = useDir();
+  const self: MemberId = me || 'a';
+  const partner = otherMember(self);
+  const today = todayISO();
 
-  const [activeTab, setActiveTab] = useState<'chores' | 'calendar'>('chores');
-  const [choreInput, setChoreInput] = useState('');
-  const [selectedRecurrence, setSelectedRecurrence] = useState<RecurrenceType>('every_2_days');
-  const [selectedAssignee, setSelectedAssignee] = useState<Assignee>('anyone');
-  const [filterAssignee, setFilterAssignee] = useState<'all' | 'me' | 'partner'>('all');
+  const [tab, setTab] = useState<'chores' | 'calendar'>('chores');
+  const [period, setPeriod] = useState<Period>('week');
+  const [filter, setFilter] = useState<'all' | MemberId>('all');
+  const [title, setTitle] = useState('');
+  const [recurrence, setRecurrence] = useState<RecurrenceType>('weekly');
+  const [assignee, setAssignee] = useState<Assignee>('anyone');
+  const [effort, setEffort] = useState<Effort>('normal');
+  const [selected, setSelected] = useState<Chore | null>(null);
 
   const [eventTitle, setEventTitle] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [eventOwner, setEventOwner] = useState<Assignee>('anyone');
 
-  useEffect(() => {
-    requestNotificationPermissions();
-  }, []);
+  const board = useMemo(() => scoreboard(choreLogs, period, today), [choreLogs, period, today]);
+  const lead = leader(board);
+  const champion = useMemo(() => lastWeekChampion(choreLogs, today), [choreLogs, today]);
 
-  const handleAddChore = async () => {
-    const title = choreInput.trim();
-    if (!title) return;
+  const visible = chores.filter((c) => filter === 'all' || c.assignedTo === filter || c.assignedTo === 'anyone');
+  const due = visible.filter((c) => (c.recurrence === 'once' ? !c.isCompleted : c.dueAt <= today));
+  const upcoming = visible.filter((c) => c.recurrence !== 'once' && c.dueAt > today);
+  const done = visible.filter((c) => c.recurrence === 'once' && c.isCompleted);
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    triggerSmoothAnimation();
-    await addChore(title, selectedRecurrence, selectedAssignee);
-    setChoreInput('');
+  const assigneeName = (a: Assignee) => (a === 'anyone' ? t('both') : memberName(a));
 
-    const id = await scheduleChoreNotification(title, 8);
-    if (!id) {
-      Alert.alert('התראות כבויות', 'יש לאפשר התראות עבור Expo Go בהגדרות המכשיר.');
-    }
+  const dueLabel = (c: Chore) => {
+    const n = diffDays(today, c.dueAt);
+    if (n < 0) return t('overdueDays', { n: -n });
+    if (n === 0) return t('dueToday');
+    if (n === 1) return t('dueTomorrow');
+    return t('dueInDays', { n });
   };
 
-  const handleToggleChore = (chore: Chore) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    triggerSmoothAnimation();
-    toggleChore(chore);
+  const pointsFor = (c: Chore, who: MemberId) => {
+    const base = EFFORT_POINTS[c.effort];
+    return c.assignedTo === otherMember(who) ? base + Math.round(base * RESCUE_BONUS_RATE) : base;
   };
 
-  const handleCycleAssignee = (chore: Chore) => {
-    Haptics.selectionAsync();
-    const cycle: Assignee[] = ['me', 'partner', 'anyone'];
-    const nextIndex = (cycle.indexOf(chore.assignedTo) + 1) % cycle.length;
-    updateChoreAssignee(chore.id, cycle[nextIndex]);
+  const complete = async (c: Chore, who: MemberId = self) => {
+    success();
+    animate();
+    setSelected(null);
+    await app.completeChore(c, who);
   };
 
-  const handleDeleteChore = (id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    triggerSmoothAnimation();
-    deleteChore(id);
+  const cycleAssignee = (c: Chore) => {
+    tap();
+    const order: Assignee[] = ['anyone', 'a', 'b'];
+    app.updateChoreAssignee(c.id, order[(order.indexOf(c.assignedTo) + 1) % order.length]);
   };
 
-  const handleAddCalendarEvent = async () => {
-    if (!eventTitle.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    triggerSmoothAnimation();
-    await addEvent(eventTitle, eventDate || 'בקרוב', eventOwner);
-    setEventTitle('');
-    setEventDate('');
+  const addChore = async () => {
+    if (!title.trim()) return;
+    animate();
+    const v = title;
+    setTitle('');
+    await app.addChore(v, recurrence, assignee, effort);
   };
 
-  const handleDeleteCalendarEvent = async (id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    triggerSmoothAnimation();
-    await deleteEvent(id);
+  const choreRow = (c: Chore, kind: 'due' | 'upcoming' | 'done') => {
+    const rescue = c.assignedTo === partner;
+    const overdue = kind === 'due' && c.dueAt < today;
+    const subtitle = (
+      <Row gap={6} style={{ marginTop: 2, flexWrap: 'wrap' }}>
+        <T v="small" color={overdue ? C.danger : C.textMuted}>
+          {kind === 'done' ? t('doneBy', { name: c.lastDoneBy ? memberName(c.lastDoneBy) : '' }) : dueLabel(c)}
+        </T>
+        {kind !== 'done' ? (
+          <>
+            <T v="small" color={C.textFaint}>
+              ·
+            </T>
+            <T v="small" color={rescue ? C.memberB : C.textMuted}>
+              {rescue ? t('pointsRescue', { n: pointsFor(c, self) }) : t('pointsN', { n: pointsFor(c, self) })}
+            </T>
+          </>
+        ) : null}
+      </Row>
+    );
+    return (
+      <ListRow
+        key={c.id}
+        title={c.title}
+        subtitle={subtitle}
+        muted={kind !== 'due'}
+        strike={kind === 'done'}
+        onPress={() => {
+          tap();
+          setSelected(c);
+        }}
+        leading={
+          <CheckCircle
+            checked={kind === 'done'}
+            color={memberColor(self)}
+            onPress={() => (kind === 'done' ? app.undoChore(c) : complete(c))}
+          />
+        }
+        trailing={
+          <Pressable hitSlop={8} onPress={() => cycleAssignee(c)}>
+            <Avatar member={c.assignedTo} label={c.assignedTo === 'anyone' ? '∞' : memberName(c.assignedTo)} size={28} />
+          </Pressable>
+        }
+      />
+    );
   };
 
-  const filteredChores = chores.filter((c) => {
-    if (filterAssignee === 'all') return true;
-    if (filterAssignee === 'me') return c.assignedTo === 'me' || c.assignedTo === 'anyone';
-    if (filterAssignee === 'partner') return c.assignedTo === 'partner' || c.assignedTo === 'anyone';
-    return true;
-  });
+  const total = board.a.points + board.b.points;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.segmentContainer}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'chores' && styles.segmentBtnActive]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setActiveTab('chores');
-            }}
-          >
-            {Icon(LucideIcons.CheckSquare, { size: 16, color: activeTab === 'chores' ? '#FFF' : Colors.subtext })}
-            <Text style={[styles.segmentText, activeTab === 'chores' && styles.segmentTextActive]}>
-              מטלות ({chores.length})
-            </Text>
-          </TouchableOpacity>
+    <Screen title={t('tabChores')} overline={formatToday(language)} right={<ProfileButton />}>
+      {/* ---------- Scoreboard ---------- */}
+      <Card style={{ marginTop: S.lg }}>
+        <Row style={{ justifyContent: 'space-between', marginBottom: S.lg }}>
+          <T v="label" color={C.textMuted}>
+            {t('scoreboard').toUpperCase()}
+          </T>
+          <Segmented
+            style={{ width: 200 }}
+            value={period}
+            onChange={setPeriod}
+            options={[
+              { key: 'week', label: t('periodWeek') },
+              { key: 'month', label: t('periodMonth') },
+              { key: 'all', label: t('periodAll') },
+            ]}
+          />
+        </Row>
 
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeTab === 'calendar' && styles.segmentBtnActive]}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setActiveTab('calendar');
-            }}
-          >
-            {Icon(LucideIcons.Calendar, { size: 16, color: activeTab === 'calendar' ? '#FFF' : Colors.subtext })}
-            <Text style={[styles.segmentText, activeTab === 'calendar' && styles.segmentTextActive]}>
-              לוח שנה ({events.length})
-            </Text>
-          </TouchableOpacity>
+        <Row style={{ alignItems: 'flex-start' }} gap={S.md}>
+          {(['a', 'b'] as MemberId[]).map((m) => {
+            const s = board[m];
+            const isLead = lead === m;
+            return (
+              <View key={m} style={{ flex: 1, gap: 4 }}>
+                <Row gap={6}>
+                  <Avatar member={m} label={memberName(m)} size={24} />
+                  <T v="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>
+                    {memberName(m)}
+                  </T>
+                  {champion === m ? <Crown size={14} color={C.accent} /> : null}
+                </Row>
+                <T v="number" color={isLead ? memberColor(m) : C.text}>
+                  {s.points}
+                </T>
+                <T v="small" color={C.textMuted}>
+                  {t('doneCount', { n: s.done })}
+                  {s.rescues ? ` · ${t('rescuesCount', { n: s.rescues })}` : ''}
+                </T>
+                {s.streak >= 2 ? (
+                  <Row gap={4}>
+                    <Flame size={13} color={C.accent} />
+                    <T v="small" color={C.accent}>
+                      {t('streakDays', { n: s.streak })}
+                    </T>
+                  </Row>
+                ) : null}
+              </View>
+            );
+          })}
+        </Row>
+
+        <View style={{ marginTop: S.lg }}>
+          <Bar value={total ? board.a.points / total : 0.5} color={C.memberA} track={C.memberB} height={8} />
         </View>
+        <T v="small" color={C.textSoft} style={{ marginTop: S.sm }}>
+          {total === 0
+            ? t('noPointsYet')
+            : lead
+              ? t('leadsBy', { name: memberName(lead), n: Math.abs(board.a.points - board.b.points) })
+              : t('tied')}
+        </T>
+        <T v="small" color={C.textFaint} style={{ marginTop: 2 }}>
+          {t('rescueRule')}
+        </T>
+      </Card>
 
-        {activeTab === 'chores' ? (
-          <>
-            <View style={styles.filterRow}>
-              <TouchableOpacity
-                style={[styles.filterChip, filterAssignee === 'all' && styles.filterChipActive]}
-                onPress={() => setFilterAssignee('all')}
-              >
-                <Text style={[styles.filterText, filterAssignee === 'all' && styles.filterTextActive]}>הכל</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterChip, filterAssignee === 'me' && styles.filterChipActive]}
-                onPress={() => setFilterAssignee('me')}
-              >
-                <Text style={[styles.filterText, filterAssignee === 'me' && styles.filterTextActive]}>המשימות שלי</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.filterChip, filterAssignee === 'partner' && styles.filterChipActive]}
-                onPress={() => setFilterAssignee('partner')}
-              >
-                <Text style={[styles.filterText, filterAssignee === 'partner' && styles.filterTextActive]}>של בת הזוג</Text>
-              </TouchableOpacity>
-            </View>
+      <Segmented
+        style={[inset, { marginTop: S.xl }]}
+        value={tab}
+        onChange={setTab}
+        options={[
+          { key: 'chores', label: `${t('chores')} · ${due.length}` },
+          { key: 'calendar', label: `${t('calendar')} · ${events.length}` },
+        ]}
+      />
 
-            <View style={styles.glassInputCard}>
-              <View style={styles.inputRow}>
-                <TouchableOpacity
-                  style={[styles.addBtn, !choreInput.trim() && styles.addBtnDisabled]}
-                  onPress={handleAddChore}
-                  disabled={!choreInput.trim()}
-                >
-                  {Icon(LucideIcons.Plus, { size: 20, color: '#FFF' })}
-                </TouchableOpacity>
-
-                <TextInput
-                  style={styles.mainInput}
-                  placeholder="מטלה חדשה (למשל: ריקון מדיח, שטיפה...)"
-                  placeholderTextColor={Colors.subtext}
-                  value={choreInput}
-                  onChangeText={setChoreInput}
-                  onSubmitEditing={handleAddChore}
-                  returnKeyType="done"
-                />
-              </View>
-
-              <View style={styles.optionsRow}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {(['every_2_days', 'daily', 'weekly', 'once'] as RecurrenceType[]).map((rec) => (
-                    <TouchableOpacity
-                      key={rec}
-                      style={[styles.optionChip, selectedRecurrence === rec && styles.optionChipActive]}
-                      onPress={() => setSelectedRecurrence(rec)}
-                    >
-                      {Icon(LucideIcons.RotateCw, { size: 12, color: selectedRecurrence === rec ? '#FFF' : Colors.subtext })}
-                      <Text style={[styles.optionText, selectedRecurrence === rec && styles.optionTextActive]}>
-                        {RECURRENCE_LABELS[rec]}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-
-                  <View style={styles.divider} />
-
-                  {(['anyone', 'me', 'partner'] as Assignee[]).map((asg) => (
-                    <TouchableOpacity
-                      key={asg}
-                      style={[
-                        styles.optionChip,
-                        selectedAssignee === asg && {
-                          backgroundColor: ASSIGNEE_CONFIG[asg].color,
-                          borderColor: ASSIGNEE_CONFIG[asg].color,
-                        },
-                      ]}
-                      onPress={() => setSelectedAssignee(asg)}
-                    >
-                      <Text style={[styles.optionText, selectedAssignee === asg && { color: '#FFF', fontWeight: '700' }]}>
-                        {ASSIGNEE_CONFIG[asg].label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </View>
-
-            <FlatList
-              data={filteredChores}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              renderItem={({ item }) => {
-                const assigneeInfo = ASSIGNEE_CONFIG[item.assignedTo];
-                return (
-                  <View style={styles.itemCard}>
-                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteChore(item.id)}>
-                      {Icon(LucideIcons.Trash2, { size: 16, color: Colors.textMuted })}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.assigneeBadge, { backgroundColor: assigneeInfo.badgeBg }]}
-                      onPress={() => handleCycleAssignee(item)}
-                    >
-                      <Text style={[styles.assigneeText, { color: assigneeInfo.color }]}>{assigneeInfo.label}</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.itemTitleCol}>
-                      <Text style={styles.itemTitle}>{item.title}</Text>
-                      <View style={styles.metaRow}>
-                        <View style={styles.metaBadge}>
-                          {Icon(LucideIcons.Clock, { size: 11, color: Colors.subtext })}
-                          <Text style={styles.metaText}>{item.dueDate}</Text>
-                        </View>
-                        <View style={styles.metaBadge}>
-                          {Icon(LucideIcons.RotateCw, { size: 11, color: Colors.primary })}
-                          <Text style={[styles.metaText, { color: Colors.primary }]}>
-                            {RECURRENCE_LABELS[item.recurrence]}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    <TouchableOpacity style={styles.checkSquare} onPress={() => handleToggleChore(item)}>
-                      {Icon(LucideIcons.Check, { size: 14, color: Colors.primary })}
-                    </TouchableOpacity>
-                  </View>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>🧹</Text>
-                  <Text style={styles.emptyTitle}>הכל נקי ומסודר!</Text>
-                  <Text style={styles.emptySub}>אין מטלות פעילות כרגע</Text>
-                </View>
-              }
-            />
-          </>
-        ) : (
-          <>
-            <View style={styles.glassInputCard}>
-              <View style={styles.inputRow}>
-                <TouchableOpacity
-                  style={[styles.addBtn, !eventTitle.trim() && styles.addBtnDisabled]}
-                  onPress={handleAddCalendarEvent}
-                  disabled={!eventTitle.trim()}
-                >
-                  {Icon(LucideIcons.Plus, { size: 20, color: '#FFF' })}
-                </TouchableOpacity>
-
-                <TextInput
-                  style={styles.mainInput}
-                  placeholder="אירוע חדש (למשל: סרט, בדיקה, תור)"
-                  placeholderTextColor={Colors.subtext}
-                  value={eventTitle}
-                  onChangeText={setEventTitle}
-                  onSubmitEditing={handleAddCalendarEvent}
-                  returnKeyType="done"
-                />
-              </View>
-
+      {tab === 'chores' ? (
+        <>
+          {/* ---------- Add chore ---------- */}
+          <Card style={{ marginTop: S.md, gap: S.md }}>
+            <View style={{ flexDirection: d.row, gap: S.sm, alignItems: 'center' }}>
               <TextInput
-                style={[styles.mainInput, { marginTop: 8 }]}
-                placeholder="מועד / יום ושעה (למשל: חמישי ב-20:30)"
-                placeholderTextColor={Colors.subtext}
-                value={eventDate}
-                onChangeText={setEventDate}
+                value={title}
+                onChangeText={setTitle}
+                onSubmitEditing={addChore}
+                placeholder={t('addChorePlaceholder')}
+                placeholderTextColor={C.textFaint}
+                selectionColor={C.accent}
+                style={[styles.input, { textAlign: d.textAlign, writingDirection: d.writingDirection }]}
               />
-
-              <View style={[styles.optionsRow, { justifyContent: 'flex-end', marginTop: 8 }]}>
-                {(['anyone', 'me', 'partner'] as Assignee[]).map((asg) => (
-                  <TouchableOpacity
-                    key={asg}
-                    style={[
-                      styles.optionChip,
-                      eventOwner === asg && {
-                        backgroundColor: ASSIGNEE_CONFIG[asg].color,
-                        borderColor: ASSIGNEE_CONFIG[asg].color,
-                      },
-                    ]}
-                    onPress={() => setEventOwner(asg)}
-                  >
-                    <Text style={[styles.optionText, eventOwner === asg && { color: '#FFF', fontWeight: '700' }]}>
-                      {ASSIGNEE_CONFIG[asg].label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <Pressable onPress={addChore} disabled={!title.trim()} style={[styles.addBtn, !title.trim() && { opacity: 0.35 }]}>
+                <Plus size={20} color={C.onAccent} strokeWidth={2.5} />
+              </Pressable>
             </View>
+            <ChipRow>
+              {RECURRENCES.map((r) => (
+                <Chip key={r} label={t(`rec_${r}` as any)} active={recurrence === r} onPress={() => setRecurrence(r)} />
+              ))}
+            </ChipRow>
+            <ChipRow>
+              {(['anyone', self, partner] as Assignee[]).map((a) => (
+                <Chip key={a} label={assigneeName(a)} active={assignee === a} color={memberColor(a)} onPress={() => setAssignee(a)} />
+              ))}
+            </ChipRow>
+            <ChipRow>
+              {EFFORTS.map((e) => (
+                <Chip
+                  key={e}
+                  label={`${t(`effort_${e}` as any)} · ${EFFORT_POINTS[e]}`}
+                  active={effort === e}
+                  onPress={() => setEffort(e)}
+                />
+              ))}
+            </ChipRow>
+          </Card>
 
-            <FlatList
-              data={events}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              renderItem={({ item }) => {
-                const ownerInfo = ASSIGNEE_CONFIG[item.owner || 'anyone'];
-                return (
-                  <View style={styles.itemCard}>
-                    <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteCalendarEvent(item.id)}>
-                      {Icon(LucideIcons.Trash2, { size: 16, color: Colors.textMuted })}
-                    </TouchableOpacity>
+          <View style={{ marginTop: S.lg }}>
+            <ChipRow scroll>
+              <Chip label={t('filterAll')} active={filter === 'all'} onPress={() => setFilter('all')} />
+              <Chip label={t('filterMine')} active={filter === self} color={memberColor(self)} onPress={() => setFilter(self)} />
+              <Chip
+                label={t('filterOf', { name: memberName(partner) })}
+                active={filter === partner}
+                color={memberColor(partner)}
+                onPress={() => setFilter(partner)}
+              />
+            </ChipRow>
+          </View>
 
-                    <View style={styles.itemTitleCol}>
-                      <Text style={styles.itemTitle}>{item.title}</Text>
-                      <Text style={styles.metaText}>📅 {item.date}</Text>
-                    </View>
+          <Section label={t('dueNow')}>
+            {due.length ? <List>{due.map((c) => choreRow(c, 'due'))}</List> : <Empty title={t('allCaughtUp')} body={t('allCaughtUpBody')} />}
+          </Section>
 
-                    <View style={[styles.assigneeBadge, { backgroundColor: ownerInfo.badgeBg }]}>
-                      <Text style={[styles.assigneeText, { color: ownerInfo.color }]}>{ownerInfo.label}</Text>
-                    </View>
-                  </View>
-                );
+          {upcoming.length ? (
+            <Section label={t('comingUp')}>
+              <List>{upcoming.map((c) => choreRow(c, 'upcoming'))}</List>
+            </Section>
+          ) : null}
+
+          {done.length ? (
+            <Section label={t('completed')}>
+              <List>{done.map((c) => choreRow(c, 'done'))}</List>
+            </Section>
+          ) : null}
+
+          {choreLogs.length ? (
+            <Section label={t('activity')}>
+              <List>
+                {choreLogs.slice(0, 8).map((l) => (
+                  <ListRow
+                    key={l.id}
+                    title={l.title}
+                    subtitle={`${memberName(l.doneBy)} · ${formatDay(l.day, language)}`}
+                    leading={<Avatar member={l.doneBy} label={memberName(l.doneBy)} size={28} />}
+                    trailing={
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <T v="bodyStrong" color={memberColor(l.doneBy)}>
+                          +{l.points + l.bonus}
+                        </T>
+                        {l.bonus ? (
+                          <T v="small" color={C.memberB}>
+                            {t('rescued')}
+                          </T>
+                        ) : null}
+                      </View>
+                    }
+                  />
+                ))}
+              </List>
+            </Section>
+          ) : null}
+        </>
+      ) : (
+        <>
+          {/* ---------- Calendar ---------- */}
+          <Card style={{ marginTop: S.md, gap: S.md }}>
+            <Field value={eventTitle} onChangeText={setEventTitle} placeholder={t('addEventPlaceholder')} />
+            <Field value={eventDate} onChangeText={setEventDate} placeholder={t('eventDatePlaceholder')} />
+            <ChipRow>
+              {(['anyone', self, partner] as Assignee[]).map((a) => (
+                <Chip key={a} label={assigneeName(a)} active={eventOwner === a} color={memberColor(a)} onPress={() => setEventOwner(a)} />
+              ))}
+            </ChipRow>
+            <Button
+              label={t('addEvent')}
+              disabled={!eventTitle.trim()}
+              onPress={async () => {
+                animate();
+                await app.addEvent(eventTitle, eventDate || t('soon'), eventOwner);
+                setEventTitle('');
+                setEventDate('');
               }}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>📆</Text>
-                  <Text style={styles.emptyTitle}>אין אירועים קרובים</Text>
-                  <Text style={styles.emptySub}>הוסיפו אירוע משותף כדי לתאם ביומן</Text>
-                </View>
-              }
             />
-          </>
-        )}
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          </Card>
+          <Section label={t('upcomingEvents')}>
+            {events.length ? (
+              <List>
+                {events.map((e) => (
+                  <ListRow
+                    key={e.id}
+                    title={e.title}
+                    subtitle={e.date}
+                    leading={
+                      <View style={styles.eventIcon}>
+                        <CalendarDays size={16} color={memberColor(e.owner)} />
+                      </View>
+                    }
+                    trailing={
+                      <IconButton onPress={() => app.deleteEvent(e.id)} accessibilityLabel={t('delete')}>
+                        <Trash2 size={16} color={C.textFaint} />
+                      </IconButton>
+                    }
+                  />
+                ))}
+              </List>
+            ) : (
+              <Empty title={t('noEvents')} />
+            )}
+          </Section>
+        </>
+      )}
+
+      {/* ---------- Chore actions ---------- */}
+      <Sheet visible={!!selected} onClose={() => setSelected(null)} title={selected?.title || ''}>
+        {selected ? (
+          <View style={{ gap: S.sm }}>
+            <T v="small" color={C.textMuted} style={{ marginBottom: S.sm }}>
+              {t(`rec_${selected.recurrence}` as any)} · {t(`effort_${selected.effort}` as any)} · {assigneeName(selected.assignedTo)}
+            </T>
+            {!(selected.recurrence === 'once' && selected.isCompleted) ? (
+              <>
+                <Button
+                  label={t('iDidIt', { n: pointsFor(selected, self) })}
+                  icon={<UserRound size={18} color={C.onAccent} />}
+                  onPress={() => complete(selected, self)}
+                />
+                <Button
+                  kind="secondary"
+                  label={t('partnerDidIt', { name: memberName(partner), n: pointsFor(selected, partner) })}
+                  icon={<HandHeart size={18} color={C.text} />}
+                  onPress={() => complete(selected, partner)}
+                />
+              </>
+            ) : (
+              <Button
+                kind="secondary"
+                label={t('undo')}
+                icon={<RotateCcw size={18} color={C.text} />}
+                onPress={() => {
+                  app.undoChore(selected);
+                  setSelected(null);
+                }}
+              />
+            )}
+            <T v="label" color={C.textMuted} style={{ marginTop: S.md }}>
+              {t('assignTo').toUpperCase()}
+            </T>
+            <ChipRow>
+              {(['anyone', self, partner] as Assignee[]).map((a) => (
+                <Chip
+                  key={a}
+                  label={assigneeName(a)}
+                  active={selected.assignedTo === a}
+                  color={memberColor(a)}
+                  onPress={() => {
+                    app.updateChoreAssignee(selected.id, a);
+                    setSelected({ ...selected, assignedTo: a });
+                  }}
+                />
+              ))}
+            </ChipRow>
+            <Button
+              kind="danger"
+              label={t('deleteChore')}
+              icon={<Trash2 size={18} color={C.danger} />}
+              style={{ marginTop: S.lg }}
+              onPress={() => {
+                animate();
+                app.deleteChore(selected.id);
+                setSelected(null);
+              }}
+            />
+          </View>
+        ) : null}
+      </Sheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-  container: { flex: 1 },
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.card,
-    padding: 6,
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 8,
-  },
-  segmentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: 10,
-  },
-  segmentBtnActive: { backgroundColor: Colors.primary },
-  segmentText: { fontSize: 13, fontWeight: '600', color: Colors.subtext },
-  segmentTextActive: { color: '#FFF' },
-  filterRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 16,
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  filterChipActive: { backgroundColor: Colors.primaryMuted, borderColor: Colors.primary },
-  filterText: { fontSize: 12, color: Colors.subtext, fontWeight: '500' },
-  filterTextActive: { color: Colors.primary, fontWeight: '700' },
-  glassInputCard: {
-    backgroundColor: Colors.card,
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  mainInput: {
-    flex: 1,
-    height: 44,
-    backgroundColor: Colors.glassInput,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    fontSize: 14,
-    textAlign: 'right',
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  addBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addBtnDisabled: { opacity: 0.4 },
-  optionsRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center' },
-  optionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: Colors.glassInput,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginRight: 6,
-  },
-  optionChipActive: { backgroundColor: Colors.primaryMuted, borderColor: Colors.primary },
-  optionText: { fontSize: 11, color: Colors.subtext },
-  optionTextActive: { color: Colors.primary, fontWeight: '700' },
-  divider: { width: 1, height: 18, backgroundColor: Colors.border, marginHorizontal: 4 },
-  listContent: { padding: 16, paddingBottom: 40 },
-  itemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  itemTitleCol: { flex: 1, paddingHorizontal: 10, alignItems: 'flex-end' },
-  itemTitle: { fontSize: 14, fontWeight: '600', color: Colors.text, marginBottom: 4, textAlign: 'right' },
-  metaRow: { flexDirection: 'row', gap: 6 },
-  metaBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: Colors.glassInput,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  metaText: { fontSize: 11, color: Colors.subtext },
-  assigneeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  assigneeText: { fontSize: 11, fontWeight: '700' },
-  checkSquare: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.primaryMuted,
-  },
-  deleteBtn: { padding: 4 },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-  emptyIcon: { fontSize: 36, marginBottom: 8 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
-  emptySub: { fontSize: 12, color: Colors.subtext, marginTop: 4 },
+  input: { flex: 1, color: C.text, ...F.body, paddingVertical: 8 },
+  addBtn: { width: 40, height: 40, borderRadius: R.md, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  eventIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' },
 });

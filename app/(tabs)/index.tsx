@@ -1,377 +1,270 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  LayoutAnimation,
-  UIManager,
-} from 'react-native';
-import * as Haptics from 'expo-haptics';
-import * as LucideIcons from 'lucide-react-native';
-import { Colors } from '../../constants/Colors';
+import React, { useMemo, useState } from 'react';
+import { LayoutAnimation, Platform, Pressable, TextInput, UIManager, View, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import { ChevronDown, ChevronUp, Plus, Receipt, Store, Trash2 } from 'lucide-react-native';
+import { C, F, R, S, money } from '../../constants/theme';
+import { CATEGORY_ORDER, QUICK_FAVORITES, UNITS, UnitType } from '../../constants/Categories';
 import { useApp, ShoppingItem } from '../../context/AppContext';
+import { recommendStore } from '../../lib/prices';
+import { formatToday } from '../../lib/dates';
 import {
-  CATEGORIES_LIST,
-  QUICK_FAVORITES,
-  CategoryConfig,
-  QuickFavorite,
-  UnitType,
-} from '../../constants/Categories';
+  Button,
+  CheckCircle,
+  Chip,
+  ChipRow,
+  Empty,
+  IconButton,
+  List,
+  ListRow,
+  ProfileButton,
+  Row,
+  Screen,
+  Section,
+  Sheet,
+  T,
+  inset,
+  thud,
+  useDir,
+} from '../../components/ui';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-
-const triggerSmoothAnimation = () => {
-  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-};
-
-const Icon = (Comp: any, props: { size?: number; color?: string; style?: any }) => {
-  const { color, ...rest } = props;
-  return React.createElement(Comp, { stroke: color, color, ...rest });
-};
+const animate = () => LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
 export default function ShoppingScreen() {
-  const {
-    shoppingItems,
-    addShoppingItem,
-    toggleShoppingItem,
-    deleteShoppingItem,
-    clearCompletedShoppingItems,
-  } = useApp();
+  const { t, language, shoppingItems, addShoppingItem, toggleShoppingItem, deleteShoppingItem, clearCompletedShoppingItems, expenses } =
+    useApp();
+  const d = useDir();
+  const [input, setInput] = useState('');
+  const [unit, setUnit] = useState<UnitType>('units');
+  const [showCollected, setShowCollected] = useState(false);
+  const [storeSheet, setStoreSheet] = useState(false);
 
-  const [inputText, setInputText] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState<UnitType>('units');
-  const [showCompleted, setShowCompleted] = useState(false);
+  const active = shoppingItems.filter((i) => !i.isCompleted);
+  const collected = shoppingItems.filter((i) => i.isCompleted);
 
-  const activeItems = shoppingItems.filter((i) => !i.isCompleted);
-  const completedItems = shoppingItems.filter((i) => i.isCompleted);
+  const rec = useMemo(
+    () => recommendStore(expenses, shoppingItems.map((i) => i.name)),
+    [expenses, shoppingItems]
+  );
 
-  const handleAddItem = async (name: string, amount: number = 1, unit?: UnitType) => {
+  const unitLabel = (u: UnitType) => t(`unit_${u}` as any);
+
+  const add = async (name: string, amount = 1, u: UnitType = unit) => {
     if (!name.trim()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    triggerSmoothAnimation();
-    await addShoppingItem(name.trim(), amount, unit || selectedUnit);
-    setInputText('');
+    thud();
+    animate();
+    setInput('');
+    await addShoppingItem(name.trim(), amount, u);
   };
 
-  const handleToggle = async (item: ShoppingItem) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    triggerSmoothAnimation();
-    await toggleShoppingItem(item.id, item.isCompleted);
+  const toggle = (item: ShoppingItem) => {
+    thud();
+    animate();
+    toggleShoppingItem(item.id, item.isCompleted);
   };
 
-  const handleDelete = async (id: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    triggerSmoothAnimation();
-    await deleteShoppingItem(id);
-  };
-
-  const handleClearCompleted = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    triggerSmoothAnimation();
-    await clearCompletedShoppingItems();
-  };
-
-  const itemsByCategory = CATEGORIES_LIST.map((category: CategoryConfig) => ({
-    ...category,
-    items: activeItems.filter((item) => item.category === category.key),
-  })).filter((cat) => cat.items.length > 0);
+  const groups = CATEGORY_ORDER.map((key) => ({ key, items: active.filter((i) => i.category === key) })).filter((g) => g.items.length);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>רשימת קניות 🛒</Text>
-          <Text style={styles.headerSub}>
-            {activeItems.length > 0 ? `${activeItems.length} פריטים נותרו לאיסוף` : 'הסל ריק ומוכן'}
-          </Text>
-        </View>
+    <Screen title={t('tabShopping')} overline={formatToday(language)} right={<ProfileButton />}>
+      <T v="small" color={C.textMuted} style={inset}>
+        {active.length ? t('itemsLeft', { n: active.length }) : t('listEmptyShort')}
+      </T>
 
-        <View style={styles.favoritesWrapper}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favScroll}>
-            {QUICK_FAVORITES.map((fav: QuickFavorite, idx: number) => (
-              <TouchableOpacity
-                key={idx}
-                style={styles.favChip}
-                onPress={() => handleAddItem(fav.name, fav.defaultAmount, fav.defaultUnit)}
-              >
-                <Text style={styles.favChipText}>+ {fav.name}</Text>
-              </TouchableOpacity>
+      {/* Cheapest store */}
+      {rec ? (
+        <Pressable onPress={() => setStoreSheet(true)} style={[styles.storeBanner, { flexDirection: d.row }]}>
+          <View style={styles.storeIcon}>
+            <Store size={18} color={C.positive} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <T v="label" color={C.positive}>
+              {(rec.scope === 'list' ? t('cheapestForList') : t('cheapestOverall')).toUpperCase()}
+            </T>
+            <T v="bodyStrong">{rec.best}</T>
+            <T v="small" color={C.textMuted}>
+              {t('saveVs', { amount: money(rec.saving), store: rec.comparedTo, n: rec.itemsCompared })}
+            </T>
+          </View>
+        </Pressable>
+      ) : null}
+
+      {/* Add item */}
+      <View style={[styles.addCard, inset]}>
+        <View style={{ flexDirection: d.row, alignItems: 'center', gap: S.sm }}>
+          <TextInput
+            value={input}
+            onChangeText={setInput}
+            onSubmitEditing={() => add(input)}
+            placeholder={t('addItemPlaceholder')}
+            placeholderTextColor={C.textFaint}
+            selectionColor={C.accent}
+            returnKeyType="done"
+            submitBehavior="submit"
+            style={[styles.addInput, { textAlign: d.textAlign, writingDirection: d.writingDirection }]}
+          />
+          <Pressable
+            onPress={() => add(input)}
+            disabled={!input.trim()}
+            style={[styles.addBtn, !input.trim() && { opacity: 0.35 }]}
+            accessibilityLabel={t('add')}
+          >
+            <Plus size={20} color={C.onAccent} strokeWidth={2.5} />
+          </Pressable>
+        </View>
+        <View style={{ flexDirection: d.row, gap: 6, marginTop: S.sm }}>
+          {UNITS.map((u) => (
+            <Pressable key={u} onPress={() => setUnit(u)} style={[styles.unit, unit === u && styles.unitActive]}>
+              <T v="small" color={unit === u ? C.text : C.textMuted} center>
+                {unitLabel(u)}
+              </T>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={{ marginTop: S.md }}>
+        <ChipRow scroll>
+          {QUICK_FAVORITES[language].map((f) => (
+            <Chip key={f.name} label={`+ ${f.name}`} onPress={() => add(f.name, f.defaultAmount, f.defaultUnit)} />
+          ))}
+        </ChipRow>
+      </View>
+
+      {groups.length === 0 && collected.length === 0 ? (
+        <Empty title={t('emptyShoppingTitle')} body={t('emptyShoppingSub')} />
+      ) : null}
+
+      {groups.map((g) => (
+        <Section key={g.key} label={t(`cat_${g.key}` as any)}>
+          <List>
+            {g.items.map((item) => (
+              <ListRow
+                key={item.id}
+                title={item.name}
+                subtitle={`${item.amount} ${unitLabel(item.unit)}`}
+                onPress={() => toggle(item)}
+                leading={<CheckCircle checked={false} onPress={() => toggle(item)} />}
+                trailing={
+                  <IconButton onPress={() => deleteShoppingItem(item.id)} accessibilityLabel={t('delete')}>
+                    <Trash2 size={16} color={C.textFaint} />
+                  </IconButton>
+                }
+              />
             ))}
-          </ScrollView>
-        </View>
+          </List>
+        </Section>
+      ))}
 
-        <View style={styles.glassInputCard}>
-          <View style={styles.inputRow}>
-            <TouchableOpacity
-              style={[styles.addBtn, !inputText.trim() && styles.addBtnDisabled]}
-              onPress={() => handleAddItem(inputText)}
-              disabled={!inputText.trim()}
+      {collected.length > 0 ? (
+        <Section
+          label={t('collectedN', { n: collected.length })}
+          action={
+            <Pressable
+              hitSlop={8}
+              onPress={() => {
+                animate();
+                setShowCollected(!showCollected);
+              }}
             >
-              {Icon(LucideIcons.Plus, { size: 20, color: '#FFF' })}
-            </TouchableOpacity>
-
-            <TextInput
-              style={styles.mainInput}
-              placeholder="הוסף פריט (למשל: עגבניות, חלב, ביצים...)"
-              placeholderTextColor={Colors.subtext}
-              value={inputText}
-              onChangeText={setInputText}
-              onSubmitEditing={() => handleAddItem(inputText)}
-              returnKeyType="done"
+              {showCollected ? <ChevronUp size={18} color={C.textMuted} /> : <ChevronDown size={18} color={C.textMuted} />}
+            </Pressable>
+          }
+        >
+          {showCollected ? (
+            <List style={{ marginBottom: S.md }}>
+              {collected.map((item) => (
+                <ListRow
+                  key={item.id}
+                  title={item.name}
+                  muted
+                  strike
+                  onPress={() => toggle(item)}
+                  leading={<CheckCircle checked onPress={() => toggle(item)} />}
+                />
+              ))}
+            </List>
+          ) : null}
+          <Row style={[inset, { gap: S.sm }]}>
+            <Button
+              label={t('addReceipt')}
+              icon={<Receipt size={18} color={C.onAccent} />}
+              onPress={() => router.push({ pathname: '/expense', params: { fromList: '1' } })}
+              style={{ flex: 1 }}
             />
-          </View>
+            <Button
+              kind="secondary"
+              label={t('clearCollected')}
+              onPress={() => {
+                animate();
+                clearCompletedShoppingItems();
+              }}
+            />
+          </Row>
+          <T v="small" color={C.textFaint} style={[inset, { marginTop: S.sm }]}>
+            {t('addReceiptHint')}
+          </T>
+        </Section>
+      ) : null}
 
-          <View style={styles.unitSelector}>
-            {(['units', 'kg', 'g', 'pack'] as UnitType[]).map((u) => (
-              <TouchableOpacity
-                key={u}
-                style={[styles.unitChip, selectedUnit === u && styles.unitChipActive]}
-                onPress={() => setSelectedUnit(u)}
-              >
-                <Text style={[styles.unitText, selectedUnit === u && styles.unitTextActive]}>
-                  {u === 'units' ? 'יח׳' : u === 'kg' ? 'ק״ג' : u === 'g' ? 'גרם' : 'חבילה'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <FlatList
-          data={itemsByCategory}
-          keyExtractor={(item) => item.key}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item: category }) => (
-            <View style={styles.categorySection}>
-              <View style={styles.catHeaderRow}>
-                <Text style={styles.catName}>{category.label}</Text>
-                <Text style={styles.catIcon}>{category.icon}</Text>
-              </View>
-
-              {category.items.map((item) => (
-                <View key={item.id} style={styles.itemCard}>
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
-                    {Icon(LucideIcons.Trash2, { size: 16, color: Colors.textMuted })}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.itemTitleCol} onPress={() => handleToggle(item)}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemMeta}>
-                      {item.amount}{' '}
-                      {item.unit === 'units' ? 'יח׳' : item.unit === 'kg' ? 'ק״ג' : item.unit === 'g' ? 'גרם' : 'חבילה'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.checkSquare} onPress={() => handleToggle(item)}>
-                    {item.isCompleted ? Icon(LucideIcons.Check, { size: 14, color: '#FFF' }) : null}
-                  </TouchableOpacity>
+      <Sheet visible={storeSheet} onClose={() => setStoreSheet(false)} title={t('priceComparison')}>
+        {rec ? (
+          <View style={{ gap: S.md }}>
+            <T v="body" color={C.textSoft}>
+              {t('priceComparisonBody', { best: rec.best, other: rec.comparedTo, pct: Math.round(rec.savingPct * 100) })}
+            </T>
+            <View style={{ borderRadius: R.md, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: C.hairline }}>
+              {rec.items.map((it, i) => (
+                <View key={it.name + i} style={[{ padding: S.md, gap: 6 }, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.hairline }]}>
+                  <T v="bodyStrong">{it.name}</T>
+                  {it.prices.map((p, j) => (
+                    <Row key={p.store} style={{ justifyContent: 'space-between' }}>
+                      <T v="small" color={j === 0 ? C.positive : C.textMuted}>
+                        {p.store}
+                      </T>
+                      <T v="small" color={j === 0 ? C.positive : C.textMuted} style={{ fontVariant: ['tabular-nums'] }}>
+                        {money(p.unitPrice, { decimals: true })}
+                      </T>
+                    </Row>
+                  ))}
                 </View>
               ))}
             </View>
-          )}
-          ListFooterComponent={
-            completedItems.length > 0 ? (
-              <View style={styles.completedSection}>
-                <TouchableOpacity
-                  style={styles.completedHeaderToggle}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    triggerSmoothAnimation();
-                    setShowCompleted(!showCompleted);
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <TouchableOpacity onPress={handleClearCompleted} style={styles.clearBtn}>
-                      <Text style={styles.clearBtnText}>מחק הכל</Text>
-                    </TouchableOpacity>
-                    {Icon(showCompleted ? LucideIcons.ChevronUp : LucideIcons.ChevronDown, {
-                      size: 16,
-                      color: Colors.subtext,
-                    })}
-                  </View>
-                  <Text style={styles.completedHeaderTitle}>נאספו ({completedItems.length})</Text>
-                </TouchableOpacity>
-
-                {showCompleted &&
-                  completedItems.map((item) => (
-                    <View key={item.id} style={[styles.itemCard, styles.itemCardCompleted]}>
-                      <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)}>
-                        {Icon(LucideIcons.Trash2, { size: 16, color: Colors.textMuted })}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={styles.itemTitleCol} onPress={() => handleToggle(item)}>
-                        <Text style={[styles.itemName, styles.itemNameCompleted]}>{item.name}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.checkSquare, styles.checkSquareActive]}
-                        onPress={() => handleToggle(item)}
-                      >
-                        {Icon(LucideIcons.Check, { size: 14, color: '#FFF' })}
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-              </View>
-            ) : null
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>✨</Text>
-              <Text style={styles.emptyTitle}>הכל מוכן ונקנה!</Text>
-              <Text style={styles.emptySub}>הוסיפו מוצרים מתוך המועדפים או בהקלדה למעלה</Text>
-            </View>
-          }
-        />
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            <T v="small" color={C.textFaint}>
+              {t('priceComparisonFoot')}
+            </T>
+          </View>
+        ) : null}
+      </Sheet>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
-  container: { flex: 1 },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
-    alignItems: 'flex-end',
-  },
-  headerTitle: { fontSize: 24, fontWeight: '800', color: Colors.text },
-  headerSub: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  favoritesWrapper: { paddingVertical: 10 },
-  favScroll: { paddingHorizontal: 16, gap: 8 },
-  favChip: {
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  favChipText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
-  glassInputCard: {
-    backgroundColor: Colors.card,
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 10,
-  },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  mainInput: {
-    flex: 1,
-    height: 44,
-    backgroundColor: Colors.glassInput,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    fontSize: 14,
-    textAlign: 'right',
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  addBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: Colors.primary,
-    justifyContent: 'center',
+  storeBanner: {
+    marginHorizontal: S.gutter,
+    marginTop: S.lg,
+    padding: S.md,
+    gap: S.md,
     alignItems: 'center',
+    borderRadius: R.lg,
+    backgroundColor: C.positiveSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(134,184,155,0.35)',
   },
-  addBtnDisabled: { opacity: 0.4 },
-  unitSelector: { flexDirection: 'row', justifyContent: 'flex-end', gap: 6 },
-  unitChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: Colors.glassInput,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  storeIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(134,184,155,0.18)', alignItems: 'center', justifyContent: 'center' },
+  addCard: {
+    marginTop: S.lg,
+    backgroundColor: C.surface,
+    borderRadius: R.lg,
+    padding: S.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: C.hairline,
   },
-  unitChipActive: {
-    backgroundColor: Colors.primaryMuted,
-    borderColor: Colors.primary,
-  },
-  unitText: { fontSize: 11, color: Colors.subtext, fontWeight: '600' },
-  unitTextActive: { color: Colors.primary, fontWeight: '700' },
-  listContent: { padding: 16, paddingBottom: 40 },
-  categorySection: { marginBottom: 18 },
-  catHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 6,
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  catName: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary },
-  catIcon: { fontSize: 14 },
-  itemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  itemCardCompleted: { opacity: 0.5 },
-  itemTitleCol: { flex: 1, alignItems: 'flex-end', paddingHorizontal: 10 },
-  itemName: { fontSize: 14, fontWeight: '600', color: Colors.text, textAlign: 'right' },
-  itemNameCompleted: { textDecorationLine: 'line-through', color: Colors.subtext },
-  itemMeta: { fontSize: 11, color: Colors.subtext, marginTop: 2 },
-  checkSquare: {
-    width: 24,
-    height: 24,
-    borderRadius: 7,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.glassInput,
-  },
-  checkSquareActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  deleteBtn: { padding: 4 },
-  completedSection: {
-    marginTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: 12,
-  },
-  completedHeaderToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    marginBottom: 8,
-  },
-  completedHeaderTitle: { fontSize: 13, fontWeight: '700', color: Colors.subtext },
-  clearBtn: {
-    backgroundColor: Colors.dangerMuted,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  clearBtnText: { fontSize: 11, color: Colors.danger, fontWeight: '600' },
-  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
-  emptyIcon: { fontSize: 36, marginBottom: 8 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: Colors.text },
-  emptySub: { fontSize: 12, color: Colors.subtext, marginTop: 4 },
+  addInput: { flex: 1, color: C.text, ...F.body, paddingHorizontal: S.sm, paddingVertical: 10 },
+  addBtn: { width: 40, height: 40, borderRadius: R.md, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  unit: { flex: 1, paddingVertical: 6, borderRadius: R.sm, backgroundColor: C.sunken },
+  unitActive: { backgroundColor: C.raised },
 });

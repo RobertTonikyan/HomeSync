@@ -1,88 +1,137 @@
-# 🏡 HomeSync — Real-Time Household Management for Couples
+# HomeSync
 
-![React Native](https://img.shields.io/badge/React_Native-Expo_v52-blue?style=for-the-badge&logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)
-![UI](https://img.shields.io/badge/UI-OLED_Dark_Glassmorphism-11131A?style=for-the-badge)
-![i18n](https://img.shields.io/badge/i18n-HE%20%7C%20RU%20%7C%20EN-green?style=for-the-badge)
+**A shared home app for couples.** Shopping, chores, money, meals and date ideas, synced live between both phones.
 
-A multi-platform household companion app built with **React Native (Expo)**, **TypeScript**, and **Firebase Firestore**, designed to streamline domestic life, chores, groceries, meal planning, and couple activities with live real-time cloud sync.
+![Version](https://img.shields.io/badge/version-2.0.0-E8A462?style=flat-square)
+![Expo SDK](https://img.shields.io/badge/Expo_SDK-57-1D2024?style=flat-square&logo=expo)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-1D2024?style=flat-square&logo=typescript)
+![Firebase](https://img.shields.io/badge/Firestore-realtime-1D2024?style=flat-square&logo=firebase)
+![Languages](https://img.shields.io/badge/i18n-HE_·_EN_·_RU-1D2024?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-1D2024?style=flat-square)
 
----
-
-## 📱 App Preview
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center"><b>Smart Grocery List</b></td>
-      <td align="center"><b>Chores & Shared Calendar</b></td>
-      <td align="center"><b>Weekly Meal Planner</b></td>
-      <td align="center"><b>Date Roulette & Home Hub</b></td>
-    </tr>
-    <tr>
-      <td><img src="assets/screenshots/shopping.png" width="220" alt="Shopping Screen"/></td>
-      <td><img src="assets/screenshots/chores.png" width="220" alt="Chores Screen"/></td>
-      <td><img src="assets/screenshots/meals.png" width="220" alt="Meals Screen"/></td>
-      <td><img src="assets/screenshots/dates.png" width="220" alt="Dates Screen"/></td>
-    </tr>
-  </table>
-</div>
+<table>
+  <tr>
+    <td align="center"><img src="assets/screenshots/shopping.png" width="200" alt="Shopping list with cheapest-store tip"/><br/><sub><b>Shopping</b></sub></td>
+    <td align="center"><img src="assets/screenshots/chores.png" width="200" alt="Chore scoreboard"/><br/><sub><b>Chores</b></sub></td>
+    <td align="center"><img src="assets/screenshots/money.png" width="200" alt="Monthly money summary"/><br/><sub><b>Money</b></sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="assets/screenshots/receipt.png" width="200" alt="Adding a receipt"/><br/><sub><b>Receipts</b></sub></td>
+    <td align="center"><img src="assets/screenshots/meals.png" width="200" alt="Weekly meal plan"/><br/><sub><b>Meals</b></sub></td>
+    <td align="center"><img src="assets/screenshots/us.png" width="200" alt="Shared note and date ideas"/><br/><sub><b>Us</b></sub></td>
+  </tr>
+</table>
 
 ---
 
-## ✨ Key Features
+## What's new in 2.0
 
-### 🛒 1. Smart Grocery Shopping
-* **Instant Auto-Categorization:** Automatically categorizes items (Produce, Dairy, Meat, Pantry, Bakery, Household) using local keyword heuristic tagging.
-* **Dual-State Cart:** Strike-through marking with one-tap batch clearing of checked items.
-* **Sync-to-Cart:** One-click transfer of ingredients from custom recipes directly to the active shopping list.
+- **New design.** Refined dark interface: graphite surfaces, one warm accent, a colour for each partner.
+- **Hebrew, English and Russian**, switchable instantly. Hebrew is fully right-to-left.
+- **Money tab.** Expenses, receipts with photos and item prices, a monthly summary, budget and "who owes whom".
+- **Cheapest supermarket.** HomeSync compares prices from your own receipts and tells you where today's list costs less.
+- **Chores as a friendly competition.** Points, a +50% bonus for taking over your partner's chore, a weekly scoreboard and streaks.
+- **Security.** Anonymous sign-in plus Firestore rules that only let household members see household data.
 
-### 🧹 2. Chores & Shared Calendar
-* **Smart Recurrence Engine:** Supports one-time, daily, every-2-days, and weekly recurring cycles. Completing a recurring chore automatically reschedules the next due date without manual reset.
-* **Assignee Ownership:** Assign chores to *Me*, *Partner*, or *Both* with color-coded badges.
-* **Shared Event Timeline:** Joint event tracking with real-time countdown badges.
+## Features
 
-### 🍲 3. Meals & Recipe Book
-* **Weekly Meal Grid:** Full 7-day schedule supporting lunch and dinner planning.
-* **Built-in & Custom Recipes:** Integrated recipe catalog with custom ingredients, prep times, and immediate grocery export.
+### Shopping
+A shared list grouped by aisle, with quick-add favourites and units. When you're done, **Add receipt** turns everything you checked into a receipt, so you only type the prices.
 
-### 🎲 4. Date Roulette & Couple's Home Hub
-* **Date Wheel:** Randomizer combining custom bucket-list ideas and built-in activity presets (Dining, Home, Outdoor).
-* **Live Shared Love Note:** Synchronized digital chalkboard for sweet messages and daily reminders.
-* **Household Teamwork Metric:** Live statistics showing active chores and completed tasks accomplished together.
+### Cheapest supermarket
+Once you have receipts from two or more chains, the shopping screen shows which one is cheaper **for the list you have right now**: by how much, and on how many items. Tap it to see the price of each item, store by store.
 
----
+### Chores
+- Real due dates for one-time, daily, every-2-days and weekly chores
+- Points by effort: quick 5 · normal 10 · big 20
+- Doing your partner's chore is a **rescue** and earns +50%
+- Weekly, monthly and all-time scoreboard, streaks, last week's champion and an activity feed
+- Mark a chore as done by you or by your partner, reassign it, or undo
+- Shared calendar for events
 
-## 🌐 Comprehensive Internationalization (i18n)
+### Money
+- Expenses by category, who paid, store and notes
+- Receipts: a compressed photo plus item lines with prices
+- Monthly total compared with last month, and an optional monthly budget
+- Who paid what, and how much to transfer to split it evenly
+- **Savings tips computed from your own data**: budget pace, categories that jumped, eating out, the cheaper store, small purchases that add up
 
-HomeSync supports 3 languages with seamless dynamic switching and text direction management:
-* 🇮🇱 **Hebrew (עברית)** — Full RTL layout and typography.
-* 🇷🇺 **Russian (Русский)** — Native localized strings.
-* 🇬🇧 **English** — Global default interface.
+### Meals
+A weekly lunch and dinner plan, built-in and personal recipes, and one tap to send ingredients to the shopping list.
 
----
-
-## 🛡️ Security & Row-Level Protection
-
-* **Row-Level Boundary:** Strict authenticated access across all 7 Firestore collections via `firestore.rules`.
-* **Environment Protection:** Firebase keys are fully isolated via `process.env.EXPO_PUBLIC_*` and excluded from git tracking via `.gitignore`. A clean template is provided in `.env.example`.
-
----
-
-## 🏗️ Architecture & Tech Stack
-
-* **Framework:** React Native with Expo SDK (Managed Workflow, Expo Router v4).
-* **Language:** TypeScript.
-* **Database & Cloud:** Firebase Firestore (Real-time snapshot listeners).
-* **UI Design System:** Custom OLED Pure Black theme (`#07080B`), Glassmorphism cards (`#11131A`), and Emerald Accent styling.
-* **Haptics & Icons:** `expo-haptics`, `lucide-react-native`.
+### Us
+A shared note for each other, a list of date ideas, and a "pick for us" button.
 
 ---
 
-## 🚀 Getting Started
+## Getting started
 
-### 1. Clone the repository
 ```bash
-git clone [https://github.com/RobertTonikyan/HomeSync.git](https://github.com/RobertTonikyan/HomeSync.git)
-cd HomeSync/homesyn
+git clone https://github.com/RobertTonikyan/HomeSync.git
+cd HomeSync
+npm install
+cp .env.example .env
+npx expo start
+```
+
+### 1. Firebase project
+1. Create a project at [console.firebase.google.com](https://console.firebase.google.com) and add a **Web app**. Copy its config values into `.env`.
+2. **Firestore Database**: create it (production mode).
+3. **Authentication → Sign-in method → enable Anonymous.**
+4. **Firestore → Rules**: paste the contents of [`firestore.rules`](firestore.rules) and publish.
+
+### 2. Household ID
+Both phones share data through `EXPO_PUBLIC_HOUSEHOLD_ID`. **Anyone who knows it can join your household**, so make it long and random:
+
+```bash
+node -e "console.log('HS-' + require('crypto').randomBytes(12).toString('hex'))"
+```
+
+Put the same value in `.env` on both phones.
+
+### 3. Run
+```bash
+npx expo start -c
+```
+On first launch, each phone picks a language, enters both partners' names, and chooses whose phone it is.
+
+---
+
+## Security
+
+| Area | How it's handled |
+|---|---|
+| Secrets | Firebase config lives only in `.env`, which is git-ignored. Nothing secret is committed. |
+| Authentication | Every device signs in anonymously. Unauthenticated requests are rejected. |
+| Authorisation | Firestore rules allow reading and writing a household's data only for devices listed in `households/{id}.memberUids`. A device can add only its own uid. |
+| Data integrity | Documents can't be moved to another household. Text lengths, amounts, points and photo sizes are validated in the rules. |
+| Photos | Receipt photos are compressed on the phone (≤ ~700 KB) and stored in a separate, member-only collection. |
+| Local storage | Only the chosen language and "whose phone" are stored on the device. |
+
+**Recommended in production:** restrict the Firebase API key to your app in Google Cloud Console, and enable [Firebase App Check](https://firebase.google.com/docs/app-check) to block requests that don't come from your app.
+
+---
+
+## Project structure
+
+```
+app/
+  (tabs)/            shopping · chores · money · meals · us
+  welcome.tsx        first-run setup
+  settings.tsx       language, identity, names, budget
+  expense.tsx        add / edit an expense or receipt
+components/ui.tsx    design-system components (direction-aware)
+constants/           theme, translations, categories, built-in content
+context/AppContext   Firestore sync and actions
+lib/                 pure logic: dates, prices, insights, competition
+services/firebase.ts Firebase init, anonymous auth, household membership
+firestore.rules      security rules
+```
+
+## Tech stack
+
+React Native 0.86 · Expo SDK 57 · Expo Router · TypeScript · Firebase Auth + Firestore · lucide icons
+
+## License
+
+[MIT](LICENSE) © 2026 Robert Tonikyan

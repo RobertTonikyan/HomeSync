@@ -2,11 +2,11 @@
   "expo": {
     "name": "HomeSyn",
     "slug": "HomeSyn",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "scheme": "homesyn",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true
     },
@@ -24,7 +24,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
-    ]
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "HomeSync uses your photos to attach receipts.",
+          "cameraPermission": "HomeSync uses the camera to photograph receipts."
+        }
+      ]
+    ],
+    "backgroundColor": "#0E0F11"
   }
 }
