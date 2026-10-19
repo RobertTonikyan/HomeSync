@@ -2,6 +2,13 @@
   "name": "homesyn",
   "version": "1.0.0",
   "main": "expo-router/entry",
+  "scripts": {
+    "preinstall": "npx npm-force-resolutions",
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
   "dependencies": {
     "expo": "~57.0.28",
     "expo-asset": "^57.0.19",
@@ -24,20 +31,15 @@
     "@types/react": "~19.3.0",
     "typescript": "~6.0.3"
   },
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
-  },
-  "private": true,
-  "overrides": {
-    "react": "19.3.1",
-    "react-dom": "19.3.1",
+  "resolutions": {
     "braces": "3.0.3",
     "node-forge": "1.3.1",
-    "decode-uri-component": "0.2.2",
-    "@grpc/grpc-js": "1.12.0",
-    "uuid": "9.0.1"
-  }
-  }
+    "decode-uri-component": "0.2.2"
+  },
+  "overrides": {
+    "braces": "3.0.3",
+    "node-forge": "1.3.1",
+    "decode-uri-component": "0.2.2"
+  },
+  "private": true
+}
